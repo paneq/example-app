@@ -33,7 +33,17 @@ class App < Karafka::App
     # Karafka will auto-discover kafka_hosts based on Zookeeper but we need it set manually
     # to run tests without running kafka and zookeeper
     config.kafka.seed_brokers = [ENV['KAFKA_HOST'] || 'kafka://127.0.0.1:9092']
-    config.client_id = 'example_app'
+    config.client_id = 'example'
+
+
+    config.kafka.ssl_ca_certs_from_system = false
+    config.kafka.sasl_over_ssl = false
+    config.kafka.sasl_plain_username = "charlie"
+    config.kafka.sasl_plain_password = "charlie"
+    config.kafka.max_wait_time = 0.1
+    config.kafka.fetcher_max_queue_size = 6000
+
+    config.logger = Logger.new(STDOUT)
   end
 
   monitor.subscribe('app.initialized') do
@@ -45,60 +55,10 @@ Karafka.monitor.subscribe(WaterDrop::Instrumentation::StdoutListener.new)
 Karafka.monitor.subscribe(Karafka::Instrumentation::StdoutListener.new)
 Karafka.monitor.subscribe(Karafka::Instrumentation::ProctitleListener.new)
 
-# Uncomment that in order to achieve code reload in development mode
-# Be aware, that this might have some side-effects. Please refer to the wiki
-# for more details on benefits and downsides of the code reload in the
-# development mode
-#
-# if Karafka::App.env.development?
-#   Karafka.monitor.subscribe(
-#     Karafka::CodeReloader.new(
-#       APP_LOADER
-#     )
-#   )
-# end
-
-# Consumer group defined with the 0.6+ routing style (recommended)
 App.consumer_groups.draw do
-  consumer_group :batched_group do
-    batch_fetching true
-
-    topic :xml_data do
-      consumer XmlMessagesConsumer
-      batch_consuming false
-      deserializer XmlDeserializer.new
-    end
-
-    topic :inline_batch_data do
-      consumer InlineBatchConsumer
-      batch_consuming true
-    end
-
-    topic :callbacked_data do
-      consumer CallbackedConsumer
-      batch_consuming true
-    end
+  consumer_group :"charlie-group" do
+    topic(:g) { consumer TrivialConsumer }
   end
-
-  # A ping-pong implementation using karafka-sidekiq backend
-  # @note The backend is totally optional, if you disable it, the game will
-  # work as well
-  consumer_group :async_pong do
-    topic :ping do
-      consumer Pong::PingConsumer
-      backend :sidekiq
-    end
-
-    topic :pong do
-      consumer Pong::PongConsumer
-      backend :sidekiq
-    end
-  end
-end
-
-Karafka.monitor.subscribe('app.initialized') do
-  # Put here all the things you want to do after the Karafka framework
-  # initialization
 end
 
 # Please read this page before you decide to use auto-reloading
